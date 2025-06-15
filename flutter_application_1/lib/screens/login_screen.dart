@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/custom_button.dart';
 import '../utils/app_colors.dart';
+import '../utils/app_error.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '/screens/home.dart';
 
@@ -49,12 +50,12 @@ class _LoginScreenState extends State<LoginScreen> {
           _buildTitle(),
           SizedBox(height: 32),
           _buildEmailField(),
-          // SizedBox(height: 20),
+          SizedBox(height: 20),
           _buildPasswordField(),
           _buildForgotPassword(),
-          // SizedBox(height: 24),
+          SizedBox(height: 24),
           _buildLoginButton(),
-          // SizedBox(height: 20),
+          SizedBox(height: 20),
           _buildRegisterLink(),
         ],
       ),
@@ -156,7 +157,11 @@ class _LoginScreenState extends State<LoginScreen> {
         MaterialPageRoute(builder: (_) => HomePage()),
       );
     } catch (e) {
-      _showErrorDialog(_getErrorMessage(e.toString()));
+      ErrorDialog.show(
+        context,
+        _getErrorMessage(e.toString()),
+        title: 'Login Error',
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -167,49 +172,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _showErrorDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: AppColors.cardBackground,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: Row(
-            children: [
-              Icon(Icons.error_outline, color: Colors.red, size: 24),
-              SizedBox(width: 8),
-              Text(
-                'Login Error',
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          content: Text(
-            message,
-            style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text(
-                'OK',
-                style: TextStyle(
-                  color: AppColors.accent,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
+    ErrorDialog.show(context, message, title: 'Login Error');
   }
 
   String _getErrorMessage(String error) {
