@@ -4,6 +4,7 @@ import '../widgets/custom_button.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_error.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'todo_screen.dart';
 import '/screens/home.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -154,7 +155,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => HomePage()),
+        MaterialPageRoute(builder: (_) => TodoScreen()),
       );
     } catch (e) {
       ErrorDialog.show(
