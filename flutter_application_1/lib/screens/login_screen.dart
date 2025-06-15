@@ -1,8 +1,9 @@
-// lib/screens/login_screen.dart
 import 'package:flutter/material.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/custom_button.dart';
 import '../utils/app_colors.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '/screens/home.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -12,6 +13,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  bool _isLoading = false; // Add this line
 
   @override
   Widget build(BuildContext context) {
@@ -47,12 +49,12 @@ class _LoginScreenState extends State<LoginScreen> {
           _buildTitle(),
           SizedBox(height: 32),
           _buildEmailField(),
-          SizedBox(height: 20),
+          // SizedBox(height: 20),
           _buildPasswordField(),
           _buildForgotPassword(),
-          SizedBox(height: 24),
+          // SizedBox(height: 24),
           _buildLoginButton(),
-          SizedBox(height: 20),
+          // SizedBox(height: 20),
           _buildRegisterLink(),
         ],
       ),
@@ -105,7 +107,11 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildLoginButton() {
-    return CustomButton(text: 'Log in', onPressed: _handleLogin);
+    return CustomButton(
+      text: 'Log in',
+      onPressed: _handleLogin,
+      isLoading: _isLoading,
+    );
   }
 
   Widget _buildRegisterLink() {
@@ -135,10 +141,93 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _handleLogin() {
-    print('Email: ${_emailController.text}');
-    print('Password: ${_passwordController.text}');
-    // Add your login logic here
+  void _handleLogin() async {
+    setState(() {
+      _isLoading = true; // Start loading
+    });
+
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailController.text,
+        password: _passwordController.text,
+      );
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => HomePage()),
+      );
+    } catch (e) {
+      _showErrorDialog(_getErrorMessage(e.toString()));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false; // Stop loading
+        });
+      }
+    }
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppColors.cardBackground,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.error_outline, color: Colors.red, size: 24),
+              SizedBox(width: 8),
+              Text(
+                'Login Error',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            message,
+            style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text(
+                'OK',
+                style: TextStyle(
+                  color: AppColors.accent,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _getErrorMessage(String error) {
+    if (error.contains('user-not-found')) {
+      return 'No user found with this email address.';
+    } else if (error.contains('wrong-password')) {
+      return 'Incorrect password. Please try again.';
+    } else if (error.contains('invalid-email')) {
+      return 'Please enter a valid email address.';
+    } else if (error.contains('user-disabled')) {
+      return 'This account has been disabled.';
+    } else if (error.contains('too-many-requests')) {
+      return 'Too many failed attempts. Please try again later.';
+    } else if (error.contains('network-request-failed')) {
+      return 'Network error. Please check your connection.';
+    } else {
+      return 'Login failed. Please check your credentials and try again.';
+    }
   }
 
   @override
