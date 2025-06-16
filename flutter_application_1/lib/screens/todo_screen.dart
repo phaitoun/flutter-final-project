@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../utils/app_colors.dart';
 import '../models/task_model.dart';
+import '../widgets/custom_button.dart';
 
 class TodoScreen extends StatefulWidget {
   @override
@@ -49,6 +50,80 @@ class _TodoScreenState extends State<TodoScreen> {
         date.year == now.year;
   }
 
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Column(
+          children: [
+            Text(
+              DateFormat('dd MMM yyyy').format(selectedDate).toUpperCase(),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              'Today',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.8),
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          Container(
+            margin: EdgeInsets.only(right: 16),
+            child: CircleAvatar(
+              backgroundColor: Colors.white,
+              radius: 18,
+              child: Icon(Icons.person, color: AppColors.background, size: 20),
+            ),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Week Calendar
+          SizedBox(height: 50),
+          Container(padding: EdgeInsets.all(16), child: _buildWeekCalendar()),
+          // My Tasks Header
+          // Container(
+          //   padding: EdgeInsets.symmetric(horizontal: 16),
+          //   alignment: Alignment.centerLeft,
+          //   child: Text(
+          //     'My tasks',
+          //     style: TextStyle(
+          //       fontSize: 20,
+          //       fontWeight: FontWeight.bold,
+          //       color: Colors.white,
+          //     ),
+          //   ),
+          // ),
+          // SizedBox(height: 16),
+          // // Tasks List
+          // Expanded(child: _buildTaskList()),
+          // SizedBox(height: 16),
+          CustomButton(
+            text: "Add Task",
+            onPressed: () => {_showAddTaskDialog()},
+          ),
+        ],
+      ),
+      // floatingActionButton: FloatingActionButton(
+      //   onPressed: () => _showAddTaskDialog(),
+      //   backgroundColor: AppColors.accent,
+      //   child: Icon(Icons.add, color: Colors.white, size: 28),
+      // ),
+    );
+  }
+
   Widget _buildWeekCalendar() {
     return Container(
       height: 80,
@@ -69,10 +144,13 @@ class _TodoScreenState extends State<TodoScreen> {
             },
             child: Container(
               width: 50,
+              height: 70, // Added explicit height for square appearance
               margin: EdgeInsets.symmetric(horizontal: 4),
               decoration: BoxDecoration(
                 color: isSelected ? AppColors.accent : AppColors.cardBackground,
-                borderRadius: BorderRadius.circular(25),
+                borderRadius: BorderRadius.circular(
+                  8,
+                ), // Reduced border radius for square look
                 border: isToday
                     ? Border.all(color: Colors.white, width: 2)
                     : null,
@@ -80,6 +158,7 @@ class _TodoScreenState extends State<TodoScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  SizedBox(height: 20),
                   Text(
                     _getDayName(date).toUpperCase(),
                     style: TextStyle(
@@ -557,127 +636,58 @@ class _TodoScreenState extends State<TodoScreen> {
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Column(
-          children: [
-            Text(
-              DateFormat('dd MMM yyyy').format(selectedDate).toUpperCase(),
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              'Today',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.8),
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          Container(
-            margin: EdgeInsets.only(right: 16),
-            child: CircleAvatar(
-              backgroundColor: Colors.white,
-              radius: 18,
-              child: Icon(Icons.person, color: AppColors.background, size: 20),
-            ),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Week Calendar
-          Container(padding: EdgeInsets.all(16), child: _buildWeekCalendar()),
-          // My Tasks Header
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'My tasks',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          SizedBox(height: 16),
-          // Tasks List
-          Expanded(
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: StreamBuilder<QuerySnapshot>(
-                stream: _firestore
-                    .collection('tasks')
-                    .orderBy('startTime')
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  }
+  Widget _buildTaskList() {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16),
+      child: StreamBuilder<QuerySnapshot>(
+        stream: _firestore.collection('tasks').orderBy('startTime').snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
 
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    );
-                  }
-
-                  List<TaskModel> tasks = snapshot.data!.docs.map((doc) {
-                    return TaskModel.fromFirestore(doc);
-                  }).toList();
-
-                  if (tasks.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.task_alt,
-                            size: 64,
-                            color: Colors.white.withOpacity(0.5),
-                          ),
-                          SizedBox(height: 16),
-                          Text(
-                            'No tasks for this day',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.7),
-                              fontSize: 16,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  return ListView.builder(
-                    itemCount: tasks.length,
-                    itemBuilder: (context, index) {
-                      return _buildTaskItem(tasks[index]);
-                    },
-                  );
-                },
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
               ),
-            ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showAddTaskDialog,
-        backgroundColor: AppColors.accent,
-        child: Icon(Icons.add, color: Colors.white, size: 28),
+            );
+          }
+
+          List<TaskModel> tasks = snapshot.data!.docs.map((doc) {
+            return TaskModel.fromFirestore(doc);
+          }).toList();
+
+          if (tasks.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.task_alt,
+                    size: 64,
+                    color: Colors.white.withOpacity(0.5),
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'No tasks for this day',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return ListView.builder(
+            itemCount: tasks.length,
+            itemBuilder: (context, index) {
+              return _buildTaskItem(tasks[index]);
+            },
+          );
+        },
       ),
     );
   }
