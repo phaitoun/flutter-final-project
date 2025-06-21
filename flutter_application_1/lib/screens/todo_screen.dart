@@ -5,6 +5,9 @@ import 'package:intl/intl.dart';
 import '../utils/app_colors.dart';
 import '../models/task_model.dart';
 import '../widgets/custom_button.dart';
+import 'create_task_screen.dart';
+import 'edit_task_screen.dart';
+import 'monthly_calendar_screen.dart';
 
 class TodoScreen extends StatefulWidget {
   @override
@@ -31,10 +34,6 @@ class _TodoScreenState extends State<TodoScreen> {
     });
   }
 
-  String _formatDate(DateTime date) {
-    return DateFormat('dd MMM yyyy').format(date);
-  }
-
   String _formatTime(DateTime date) {
     return DateFormat('HH:mm').format(date);
   }
@@ -58,26 +57,33 @@ class _TodoScreenState extends State<TodoScreen> {
           icon: Icon(Icons.arrow_back_ios, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Column(
-          children: [
-            Text(
-              DateFormat('dd MMM yyyy').format(selectedDate).toUpperCase(),
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+        title: GestureDetector(
+          onTap: _navigateToCalendar, // Add this tap handler
+          child: Column(
+            children: [
+              Text(
+                DateFormat('dd MMM yyyy').format(selectedDate).toUpperCase(),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            Text(
-              'Today',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.8),
-                fontSize: 14,
+              Text(
+                'Today',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.8),
+                  fontSize: 12,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
+          IconButton(
+            icon: Icon(Icons.calendar_month, color: Colors.white),
+            onPressed: _navigateToCalendar, // Add calendar button
+          ),
           Container(
             margin: EdgeInsets.only(right: 16),
             child: CircleAvatar(
@@ -91,232 +97,131 @@ class _TodoScreenState extends State<TodoScreen> {
       body: Column(
         children: [
           // Week Calendar
-          SizedBox(height: 50),
-          Container(padding: EdgeInsets.all(16), child: _buildWeekCalendar()),
+          Container(
+            margin: EdgeInsets.only(top: 10),
+            padding: EdgeInsets.all(16),
+            child: _buildWeekCalendar(),
+          ),
           // My Tasks Header
-          // Container(
-          //   padding: EdgeInsets.symmetric(horizontal: 16),
-          //   alignment: Alignment.centerLeft,
-          //   child: Text(
-          //     'My tasks',
-          //     style: TextStyle(
-          //       fontSize: 20,
-          //       fontWeight: FontWeight.bold,
-          //       color: Colors.white,
-          //     ),
-          //   ),
-          // ),
-          // SizedBox(height: 16),
-          // // Tasks List
-          // Expanded(child: _buildTaskList()),
-          // SizedBox(height: 16),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'My tasks',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          SizedBox(height: 16),
+          // Tasks List
+          Expanded(child: _buildTaskList()),
+          SizedBox(height: 16),
+          // Add Task Button
           CustomButton(
             text: "Add Task",
-            onPressed: () => {_showAddTaskDialog()},
+            onPressed: () => _navigateToCreateTask(),
           ),
+          SizedBox(height: 20),
         ],
       ),
-      // floatingActionButton: FloatingActionButton(
-      //   onPressed: () => _showAddTaskDialog(),
-      //   backgroundColor: AppColors.accent,
-      //   child: Icon(Icons.add, color: Colors.white, size: 28),
-      // ),
+    );
+  }
+
+  void _navigateToCalendar() async {
+    final DateTime? result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => MonthlyCalendarScreen()),
+    );
+
+    if (result != null) {
+      setState(() {
+        selectedDate = result;
+      });
+    }
+  }
+
+  void _navigateToCreateTask() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CreateTaskScreen(selectedDate: selectedDate),
+      ),
+    );
+  }
+
+  void _navigateToEditTask(TaskModel task) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => EditTaskScreen(task: task)),
     );
   }
 
   Widget _buildWeekCalendar() {
     return Container(
       height: 80,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: weekDates.length,
-        itemBuilder: (context, index) {
-          DateTime date = weekDates[index];
-          bool isSelected =
-              date.day == selectedDate.day && date.month == selectedDate.month;
-          bool isToday = _isToday(date);
+      child: Center(
+        child: ListView.builder(
+          shrinkWrap: true,
+          scrollDirection: Axis.horizontal,
+          itemCount: weekDates.length,
+          itemBuilder: (context, index) {
+            DateTime date = weekDates[index];
+            bool isSelected =
+                date.day == selectedDate.day &&
+                date.month == selectedDate.month;
+            bool isToday = _isToday(date);
 
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                selectedDate = date;
-              });
-            },
-            child: Container(
-              width: 50,
-              height: 70, // Added explicit height for square appearance
-              margin: EdgeInsets.symmetric(horizontal: 4),
-              decoration: BoxDecoration(
-                color: isSelected ? AppColors.accent : AppColors.cardBackground,
-                borderRadius: BorderRadius.circular(
-                  8,
-                ), // Reduced border radius for square look
-                border: isToday
-                    ? Border.all(color: Colors.white, width: 2)
-                    : null,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(height: 20),
-                  Text(
-                    _getDayName(date).toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: isSelected ? Colors.white : AppColors.textPrimary,
-                    ),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    date.day.toString().padLeft(2, '0'),
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: isSelected ? Colors.white : AppColors.textPrimary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildTaskItem(TaskModel task) {
-    return Dismissible(
-      key: Key(task.id),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: EdgeInsets.only(right: 20),
-        color: Colors.red,
-        child: Icon(Icons.delete, color: Colors.white, size: 30),
-      ),
-      onDismissed: (direction) {
-        _deleteTask(task.id);
-      },
-      child: Container(
-        margin: EdgeInsets.only(bottom: 12),
-        padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.cardBackground,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 4,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // Time
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _formatTime(task.startTime),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w500,
-                  ),
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  selectedDate = date;
+                });
+              },
+              child: Container(
+                width: 50,
+                height: 70,
+                margin: EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppColors.accent
+                      : AppColors.cardBackground,
+                  borderRadius: BorderRadius.circular(8),
+                  border: isToday
+                      ? Border.all(color: Colors.white, width: 2)
+                      : null,
                 ),
-                Text(
-                  _formatTime(task.endTime),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textPrimary.withOpacity(0.7),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(width: 16),
-            // Task Details
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    task.title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                      decoration: task.isCompleted
-                          ? TextDecoration.lineThrough
-                          : TextDecoration.none,
-                    ),
-                  ),
-                  if (task.description.isNotEmpty)
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
                     Text(
-                      task.description,
+                      _getDayName(date).toUpperCase(),
                       style: TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textPrimary.withOpacity(0.7),
-                        decoration: task.isCompleted
-                            ? TextDecoration.lineThrough
-                            : TextDecoration.none,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: isSelected
+                            ? Colors.white
+                            : AppColors.textPrimary,
                       ),
                     ),
-                ],
+                    SizedBox(height: 4),
+                    Text(
+                      date.day.toString().padLeft(2, '0'),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected
+                            ? Colors.white
+                            : AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            // Actions
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Checkbox
-                GestureDetector(
-                  onTap: () => _toggleTaskCompletion(task),
-                  child: Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: task.isCompleted
-                          ? AppColors.accent
-                          : Colors.transparent,
-                      border: Border.all(color: AppColors.accent, width: 2),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: task.isCompleted
-                        ? Icon(Icons.check, size: 16, color: Colors.white)
-                        : null,
-                  ),
-                ),
-                SizedBox(width: 12),
-                // Edit Button
-                GestureDetector(
-                  onTap: () => _showEditTaskDialog(task),
-                  child: Container(
-                    padding: EdgeInsets.all(4),
-                    child: Icon(
-                      Icons.edit,
-                      size: 20,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-                SizedBox(width: 8),
-                // Delete Button
-                GestureDetector(
-                  onTap: () => _showDeleteConfirmation(task),
-                  child: Container(
-                    padding: EdgeInsets.all(4),
-                    child: Icon(
-                      Icons.delete_outline,
-                      size: 20,
-                      color: Colors.red,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -338,312 +243,188 @@ class _TodoScreenState extends State<TodoScreen> {
     );
   }
 
-  void _showDeleteConfirmation(TaskModel task) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Delete Task'),
-          content: Text('Are you sure you want to delete this task?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _deleteTask(task.id);
-              },
-              child: Text('Delete', style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showEditTaskDialog(TaskModel task) {
-    final TextEditingController titleController = TextEditingController(
-      text: task.title,
-    );
-    final TextEditingController descriptionController = TextEditingController(
-      text: task.description,
-    );
-    TimeOfDay startTime = TimeOfDay.fromDateTime(task.startTime);
-    TimeOfDay endTime = TimeOfDay.fromDateTime(task.endTime);
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: Text('Edit Task'),
-              content: SingleChildScrollView(
+  Widget _buildTaskItem(TaskModel task) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 12),
+      child: Dismissible(
+        key: Key(task.id),
+        direction: DismissDirection.endToStart,
+        background: Container(
+          alignment: Alignment.centerRight,
+          padding: EdgeInsets.only(right: 20),
+          decoration: BoxDecoration(
+            color: Colors.red,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 4,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Icon(Icons.delete, color: Colors.white, size: 30),
+        ),
+        onDismissed: (direction) {
+          _deleteTask(task.id);
+        },
+        child: Container(
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.cardBackground,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 4,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // Time
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _formatTime(task.startTime),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    _formatTime(task.endTime),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textPrimary.withOpacity(0.7),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(width: 16),
+              // Task Details
+              Expanded(
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TextField(
-                      controller: titleController,
-                      decoration: InputDecoration(
-                        labelText: 'Task Title',
-                        border: OutlineInputBorder(),
+                    Text(
+                      task.title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                        decoration: task.isCompleted
+                            ? TextDecoration.lineThrough
+                            : TextDecoration.none,
                       ),
                     ),
-                    SizedBox(height: 16),
-                    TextField(
-                      controller: descriptionController,
-                      decoration: InputDecoration(
-                        labelText: 'Description',
-                        border: OutlineInputBorder(),
+                    if (task.description.isNotEmpty)
+                      Text(
+                        task.description,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textPrimary.withOpacity(0.7),
+                          decoration: task.isCompleted
+                              ? TextDecoration.lineThrough
+                              : TextDecoration.none,
+                        ),
                       ),
-                      maxLines: 3,
-                    ),
-                    SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ListTile(
-                            title: Text('Start Time'),
-                            subtitle: Text(startTime.format(context)),
-                            onTap: () async {
-                              TimeOfDay? picked = await showTimePicker(
-                                context: context,
-                                initialTime: startTime,
-                              );
-                              if (picked != null) {
-                                setState(() {
-                                  startTime = picked;
-                                });
-                              }
-                            },
-                          ),
-                        ),
-                        Expanded(
-                          child: ListTile(
-                            title: Text('End Time'),
-                            subtitle: Text(endTime.format(context)),
-                            onTap: () async {
-                              TimeOfDay? picked = await showTimePicker(
-                                context: context,
-                                initialTime: endTime,
-                              );
-                              if (picked != null) {
-                                setState(() {
-                                  endTime = picked;
-                                });
-                              }
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    _updateTask(
-                      task.id,
-                      titleController.text,
-                      descriptionController.text,
-                      startTime,
-                      endTime,
-                    );
-                    Navigator.of(context).pop();
-                  },
-                  child: Text('Save'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _updateTask(
-    String taskId,
-    String title,
-    String description,
-    TimeOfDay startTime,
-    TimeOfDay endTime,
-  ) {
-    DateTime startDateTime = DateTime(
-      selectedDate.year,
-      selectedDate.month,
-      selectedDate.day,
-      startTime.hour,
-      startTime.minute,
-    );
-
-    DateTime endDateTime = DateTime(
-      selectedDate.year,
-      selectedDate.month,
-      selectedDate.day,
-      endTime.hour,
-      endTime.minute,
-    );
-
-    _firestore.collection('tasks').doc(taskId).update({
-      'title': title,
-      'description': description,
-      'startTime': startDateTime,
-      'endTime': endDateTime,
-    });
-  }
-
-  void _showAddTaskDialog() {
-    final TextEditingController titleController = TextEditingController();
-    final TextEditingController descriptionController = TextEditingController();
-    TimeOfDay startTime = TimeOfDay.now();
-    TimeOfDay endTime = TimeOfDay.fromDateTime(
-      DateTime.now().add(Duration(hours: 1)),
-    );
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: Text('Add New Task'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: titleController,
-                      decoration: InputDecoration(
-                        labelText: 'Task Title',
-                        border: OutlineInputBorder(),
+              // Actions
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Edit Button
+                  GestureDetector(
+                    onTap: () => _navigateToEditTask(task),
+                    child: Container(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(
+                        Icons.edit,
+                        size: 20,
+                        color: AppColors.textPrimary,
                       ),
                     ),
-                    SizedBox(height: 16),
-                    TextField(
-                      controller: descriptionController,
-                      decoration: InputDecoration(
-                        labelText: 'Description',
-                        border: OutlineInputBorder(),
+                  ),
+                  SizedBox(width: 12),
+                  // Checkbox
+                  GestureDetector(
+                    onTap: () => _toggleTaskCompletion(task),
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: task.isCompleted
+                            ? AppColors.accent
+                            : Colors.transparent,
+                        border: Border.all(color: AppColors.accent, width: 2),
+                        borderRadius: BorderRadius.circular(4),
                       ),
-                      maxLines: 3,
+                      child: task.isCompleted
+                          ? Icon(Icons.check, size: 16, color: Colors.white)
+                          : null,
                     ),
-                    SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ListTile(
-                            title: Text('Start Time'),
-                            subtitle: Text(startTime.format(context)),
-                            onTap: () async {
-                              TimeOfDay? picked = await showTimePicker(
-                                context: context,
-                                initialTime: startTime,
-                              );
-                              if (picked != null) {
-                                setState(() {
-                                  startTime = picked;
-                                });
-                              }
-                            },
-                          ),
-                        ),
-                        Expanded(
-                          child: ListTile(
-                            title: Text('End Time'),
-                            subtitle: Text(endTime.format(context)),
-                            onTap: () async {
-                              TimeOfDay? picked = await showTimePicker(
-                                context: context,
-                                initialTime: endTime,
-                              );
-                              if (picked != null) {
-                                setState(() {
-                                  endTime = picked;
-                                });
-                              }
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text('Cancels'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    if (titleController.text.isNotEmpty) {
-                      _addTask(
-                        titleController.text,
-                        descriptionController.text,
-                        startTime,
-                        endTime,
-                      );
-                      Navigator.of(context).pop();
-                    }
-                  },
-                  child: Text('Add'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+            ],
+          ),
+        ),
+      ),
     );
-  }
-
-  void _addTask(
-    String title,
-    String description,
-    TimeOfDay startTime,
-    TimeOfDay endTime,
-  ) {
-    DateTime startDateTime = DateTime(
-      selectedDate.year,
-      selectedDate.month,
-      selectedDate.day,
-      startTime.hour,
-      startTime.minute,
-    );
-
-    DateTime endDateTime = DateTime(
-      selectedDate.year,
-      selectedDate.month,
-      selectedDate.day,
-      endTime.hour,
-      endTime.minute,
-    );
-
-    _firestore.collection('tasks').add({
-      'title': title,
-      'description': description,
-      'startTime': startDateTime,
-      'endTime': endDateTime,
-      'date': selectedDate,
-      'isCompleted': false,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
   }
 
   Widget _buildTaskList() {
+    // Normalize selectedDate to start of day (00:00:00) for proper comparison
+    DateTime normalizedDate = DateTime(
+      selectedDate.year,
+      selectedDate.month,
+      selectedDate.day,
+    );
+
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16),
       child: StreamBuilder<QuerySnapshot>(
-        stream: _firestore.collection('tasks').orderBy('startTime').snapshots(),
+        stream: _firestore
+            .collection('tasks')
+            .where('date', isEqualTo: Timestamp.fromDate(normalizedDate))
+            .snapshots(), // Removed orderBy to avoid composite index requirement
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: Colors.red.withOpacity(0.7),
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'Error loading tasks',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 16,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    snapshot.error.toString(),
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.5),
+                      fontSize: 12,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            );
           }
 
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -654,11 +435,7 @@ class _TodoScreenState extends State<TodoScreen> {
             );
           }
 
-          List<TaskModel> tasks = snapshot.data!.docs.map((doc) {
-            return TaskModel.fromFirestore(doc);
-          }).toList();
-
-          if (tasks.isEmpty) {
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -681,12 +458,51 @@ class _TodoScreenState extends State<TodoScreen> {
             );
           }
 
-          return ListView.builder(
-            itemCount: tasks.length,
-            itemBuilder: (context, index) {
-              return _buildTaskItem(tasks[index]);
-            },
-          );
+          try {
+            List<TaskModel> tasks = snapshot.data!.docs.map((doc) {
+              return TaskModel.fromFirestore(doc);
+            }).toList();
+
+            // Sort tasks by startTime in Dart instead of Firestore
+            tasks.sort((a, b) => a.startTime.compareTo(b.startTime));
+
+            return ListView.builder(
+              itemCount: tasks.length,
+              itemBuilder: (context, index) {
+                return _buildTaskItem(tasks[index]);
+              },
+            );
+          } catch (e) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: Colors.red.withOpacity(0.7),
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'Error parsing tasks',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 16,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    e.toString(),
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.5),
+                      fontSize: 12,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            );
+          }
         },
       ),
     );

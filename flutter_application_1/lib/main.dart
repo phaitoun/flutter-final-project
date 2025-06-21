@@ -26,12 +26,12 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Name App',
       theme: AppTheme.lightTheme,
-      home: LoginScreen(),
+      home: TodoScreen(),
       debugShowCheckedModeBanner: false,
       routes: {
+        '/todo': (context) => TodoScreen(),
         '/login': (context) => LoginScreen(),
         '/register': (context) => RegisterScreen(),
-        '/todo': (context) => TodoScreen(),
       },
     );
   }
