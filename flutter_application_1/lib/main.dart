@@ -26,7 +26,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Name App',
       theme: AppTheme.lightTheme,
-      home: TodoScreen(),
+      home: LoginScreen(),
       debugShowCheckedModeBanner: false,
       routes: {
         '/todo': (context) => TodoScreen(),

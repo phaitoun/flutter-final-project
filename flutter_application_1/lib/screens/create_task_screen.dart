@@ -1,6 +1,7 @@
 // lib/screens/create_task_screen.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import '../utils/app_colors.dart';
 
@@ -15,6 +16,7 @@ class CreateTaskScreen extends StatefulWidget {
 
 class _CreateTaskScreenState extends State<CreateTaskScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
   final TextEditingController titleController = TextEditingController();
   final TextEditingController descriptionController = TextEditingController();
 
@@ -368,7 +370,19 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     }
   }
 
-  void _createTask() {
+  void _createTask() async {
+    // Check if user is authenticated
+    User? currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please login to create tasks'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     if (titleController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -394,35 +408,38 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       endTime.hour,
       endTime.minute,
     );
+    DateTime normalizedDate = DateTime(
+      selectedDate.year,
+      selectedDate.month,
+      selectedDate.day,
+    );
+    try {
+      await _firestore.collection('tasks').add({
+        'title': titleController.text.trim(),
+        'description': descriptionController.text.trim(),
+        'startTime': startDateTime,
+        'endTime': endDateTime,
+        'date': normalizedDate,
+        'isCompleted': false,
+        'userId': currentUser.uid, // Add user ID from Firebase Auth
+        'createdAt': FieldValue.serverTimestamp(),
+      });
 
-    _firestore
-        .collection('tasks')
-        .add({
-          'title': titleController.text.trim(),
-          'description': descriptionController.text.trim(),
-          'startTime': startDateTime,
-          'endTime': endDateTime,
-          'date': selectedDate,
-          'isCompleted': false,
-          'createdAt': FieldValue.serverTimestamp(),
-        })
-        .then((_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Task created successfully!'),
-              backgroundColor: Color(0xFFB8860B),
-            ),
-          );
-          Navigator.pop(context);
-        })
-        .catchError((error) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error creating task: $error'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Task created successfully!'),
+          backgroundColor: Color(0xFFB8860B),
+        ),
+      );
+      Navigator.pop(context);
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error creating task: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override

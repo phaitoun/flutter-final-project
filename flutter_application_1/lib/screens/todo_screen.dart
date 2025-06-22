@@ -8,6 +8,7 @@ import '../widgets/custom_button.dart';
 import 'create_task_screen.dart';
 import 'edit_task_screen.dart';
 import 'monthly_calendar_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class TodoScreen extends StatefulWidget {
   @override
@@ -15,6 +16,7 @@ class TodoScreen extends StatefulWidget {
 }
 
 class _TodoScreenState extends State<TodoScreen> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   DateTime selectedDate = DateTime.now();
   List<DateTime> weekDates = [];
@@ -53,13 +55,15 @@ class _TodoScreenState extends State<TodoScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: AppColors.background,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          icon: Icon(Icons.calendar_month, color: Colors.white),
+          onPressed: _navigateToCalendar,
         ),
         title: GestureDetector(
-          onTap: _navigateToCalendar, // Add this tap handler
+          onTap: _navigateToCalendar,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 DateFormat('dd MMM yyyy').format(selectedDate).toUpperCase(),
@@ -80,20 +84,24 @@ class _TodoScreenState extends State<TodoScreen> {
           ),
         ),
         actions: [
-          IconButton(
-            icon: Icon(Icons.calendar_month, color: Colors.white),
-            onPressed: _navigateToCalendar, // Add calendar button
-          ),
-          Container(
-            margin: EdgeInsets.only(right: 16),
-            child: CircleAvatar(
-              backgroundColor: Colors.white,
-              radius: 18,
-              child: Icon(Icons.person, color: AppColors.background, size: 20),
+          GestureDetector(
+            onTap: _navigateToCalendar,
+            child: Container(
+              margin: EdgeInsets.only(right: 16),
+              child: CircleAvatar(
+                backgroundColor: Colors.white,
+                radius: 18,
+                child: Icon(
+                  Icons.person,
+                  color: AppColors.background,
+                  size: 20,
+                ),
+              ),
             ),
           ),
         ],
       ),
+
       body: Column(
         children: [
           // Week Calendar
@@ -386,13 +394,17 @@ class _TodoScreenState extends State<TodoScreen> {
       selectedDate.month,
       selectedDate.day,
     );
-
+    User? currentUser = _auth.currentUser;
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16),
       child: StreamBuilder<QuerySnapshot>(
         stream: _firestore
             .collection('tasks')
-            .where('date', isEqualTo: Timestamp.fromDate(normalizedDate))
+            .where('date', isEqualTo: normalizedDate)
+            .where(
+              'userId',
+              isEqualTo: currentUser?.uid,
+            ) // Replace with actual user ID
             .snapshots(), // Removed orderBy to avoid composite index requirement
         builder: (context, snapshot) {
           if (snapshot.hasError) {
@@ -460,6 +472,8 @@ class _TodoScreenState extends State<TodoScreen> {
 
           try {
             List<TaskModel> tasks = snapshot.data!.docs.map((doc) {
+              print(normalizedDate);
+              print(TaskModel.fromFirestore(doc));
               return TaskModel.fromFirestore(doc);
             }).toList();
 
