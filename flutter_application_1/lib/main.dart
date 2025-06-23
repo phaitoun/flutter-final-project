@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
@@ -26,12 +27,36 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Name App',
       theme: AppTheme.lightTheme,
-      home: LoginScreen(),
+      home: AuthWrapper(), // Changed from LoginScreen() to AuthWrapper()
       debugShowCheckedModeBanner: false,
       routes: {
         '/todo': (context) => TodoScreen(),
         '/login': (context) => LoginScreen(),
         '/register': (context) => RegisterScreen(),
+      },
+    );
+  }
+}
+
+// New AuthWrapper widget to handle authentication state
+class AuthWrapper extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        // Show loading spinner while checking auth state
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+
+        // If user is logged in, go to TodoScreen
+        if (snapshot.hasData && snapshot.data != null) {
+          return TodoScreen();
+        }
+
+        // If user is not logged in, go to LoginScreen
+        return LoginScreen();
       },
     );
   }

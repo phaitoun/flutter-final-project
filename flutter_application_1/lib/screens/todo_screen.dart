@@ -8,6 +8,7 @@ import '../widgets/custom_button.dart';
 import 'create_task_screen.dart';
 import 'edit_task_screen.dart';
 import 'monthly_calendar_screen.dart';
+import 'profile_screen.dart'; // Add this import
 import 'package:firebase_auth/firebase_auth.dart';
 
 class TodoScreen extends StatefulWidget {
@@ -85,7 +86,7 @@ class _TodoScreenState extends State<TodoScreen> {
         ),
         actions: [
           GestureDetector(
-            onTap: _navigateToCalendar,
+            onTap: _navigateToProfile, // Updated to navigate to profile
             child: Container(
               margin: EdgeInsets.only(right: 16),
               child: CircleAvatar(
@@ -149,6 +150,16 @@ class _TodoScreenState extends State<TodoScreen> {
         selectedDate = result;
       });
     }
+  }
+
+  // Updated profile navigation method
+  void _navigateToProfile() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => ProfileScreen()),
+    );
+    // Refresh the current screen when returning from profile
+    setState(() {});
   }
 
   void _navigateToCreateTask() {
@@ -371,7 +382,6 @@ class _TodoScreenState extends State<TodoScreen> {
                             ? AppColors.accent
                             : Colors.transparent,
                         border: Border.all(color: AppColors.accent, width: 2),
-                        borderRadius: BorderRadius.circular(4),
                       ),
                       child: task.isCompleted
                           ? Icon(Icons.check, size: 16, color: Colors.white)
