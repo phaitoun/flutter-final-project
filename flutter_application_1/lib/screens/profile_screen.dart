@@ -1,8 +1,10 @@
 // lib/screens/profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/app_colors.dart';
 import '../main.dart';
+import 'update_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   @override
@@ -11,12 +13,12 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final TextEditingController _nameController = TextEditingController();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   User? currentUser;
   String userName = '';
   String userEmail = '';
-  bool isEditingName = false;
+  String? profileImageUrl;
 
   @override
   void initState() {
@@ -24,51 +26,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadUserData();
   }
 
-  void _loadUserData() {
+  Future<void> _loadUserData() async {
     currentUser = _auth.currentUser;
     if (currentUser != null) {
-      setState(() {
-        userEmail = currentUser!.email ?? '';
-        userName = currentUser!.displayName ?? 'Full Name';
-        _nameController.text = userName;
-      });
+      try {
+        // Try to load from Firestore first
+        DocumentSnapshot userDoc = await _firestore
+            .collection('users')
+            .doc(currentUser!.uid)
+            .get();
+
+        if (userDoc.exists) {
+          Map<String, dynamic> userData =
+              userDoc.data() as Map<String, dynamic>;
+          setState(() {
+            userEmail = currentUser!.email ?? '';
+            String firstName = userData['firstName'] ?? '';
+            String lastName = userData['lastName'] ?? '';
+            userName = '$firstName $lastName'.trim();
+            if (userName.isEmpty) {
+              userName = currentUser!.displayName ?? 'Full Name';
+            }
+            profileImageUrl =
+                userData['profileImageUrl'] ?? currentUser!.photoURL;
+          });
+        } else {
+          // Fallback to Firebase Auth data
+          setState(() {
+            userEmail = currentUser!.email ?? '';
+            userName = currentUser!.displayName ?? 'Full Name';
+            profileImageUrl = currentUser!.photoURL;
+          });
+        }
+      } catch (e) {
+        // Fallback to Firebase Auth data on error
+        setState(() {
+          userEmail = currentUser!.email ?? '';
+          userName = currentUser!.displayName ?? 'Full Name';
+          profileImageUrl = currentUser!.photoURL;
+        });
+      }
     }
   }
 
-  Future<void> _updateDisplayName() async {
-    if (currentUser != null && _nameController.text.trim().isNotEmpty) {
-      try {
-        await currentUser!.updateDisplayName(_nameController.text.trim());
-        await currentUser!.reload();
-        currentUser = _auth.currentUser;
+  Future<void> _navigateToUpdateProfile() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => UpdateProfileScreen()),
+    );
 
-        setState(() {
-          userName = _nameController.text.trim();
-          isEditingName = false;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Profile updated successfully'),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating profile'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        );
-      }
+    // Refresh profile data if update was successful
+    if (result == true) {
+      _loadUserData();
     }
   }
 
@@ -104,7 +113,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _logout() async {
     try {
       await _auth.signOut();
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => AuthWrapper()),
       );
@@ -122,55 +131,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  void _showEditNameDialog() {
-    _nameController.text = userName;
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: Text(
-            'Edit Profile',
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-          ),
-          content: TextField(
-            controller: _nameController,
-            decoration: InputDecoration(
-              labelText: 'Full Name',
-              labelStyle: TextStyle(color: Colors.grey[600]),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
+  Widget _buildProfileAvatar() {
+    return Container(
+      width: 100,
+      height: 100,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: Color(0xFFD4A574), width: 3),
+      ),
+      child: profileImageUrl != null
+          ? ClipOval(
+              child: Image.network(
+                profileImageUrl!,
+                fit: BoxFit.cover,
+                width: 100,
+                height: 100,
+                errorBuilder: (context, error, stackTrace) {
+                  return Icon(Icons.person, size: 50, color: Colors.grey[600]);
+                },
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: CircularProgressIndicator(
+                      color: Color(0xFFD4A574),
+                      strokeWidth: 2,
+                    ),
+                  );
+                },
               ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: Color(0xFFD4A574), width: 2),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                _updateDisplayName();
-                Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFFD4A574),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: Text('Save', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        );
-      },
+            )
+          : Icon(Icons.person, size: 50, color: Colors.grey[600]),
     );
   }
 
@@ -185,6 +175,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
           icon: Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
+        title: Text(
+          'Profile',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        centerTitle: true,
       ),
       body: Center(
         child: Padding(
@@ -193,15 +192,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // Profile Avatar
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.black, width: 3),
-                ),
-                child: Icon(Icons.person, size: 50, color: Colors.black),
-              ),
+              _buildProfileAvatar(),
 
               SizedBox(height: 24),
 
@@ -225,12 +216,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               SizedBox(height: 48),
 
-              // Edit Profile Button
+              // Update Profile Button
               Container(
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: _showEditNameDialog,
+                  onPressed: _navigateToUpdateProfile,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Color(0xFFF5F5F5),
                     foregroundColor: Colors.black,
@@ -239,9 +230,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: Text(
-                    'Edit Profile',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.edit, size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Update Profile',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -262,9 +263,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: Text(
-                    'Change Password',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.lock_outline, size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Change Password',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -285,9 +296,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: Text(
-                    'Log out',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.logout, size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Log out',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -298,11 +319,5 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    super.dispose();
   }
 }
