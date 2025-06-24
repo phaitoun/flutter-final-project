@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/app_colors.dart';
 import '../main.dart';
 import 'update_profile_screen.dart';
+import 'change_password_screen.dart'; // Add this import
 
 class ProfileScreen extends StatefulWidget {
   @override
@@ -81,32 +82,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _changePassword() async {
-    if (currentUser != null && currentUser!.email != null) {
-      try {
-        await _auth.sendPasswordResetEmail(email: currentUser!.email!);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Password reset email sent'),
-            backgroundColor: Colors.blue,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
+  // Updated method to navigate to change password screen
+  Future<void> _navigateToChangePassword() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => ChangePasswordScreen()),
+    );
+
+    // Show success message if password was changed
+    if (result == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Password changed successfully'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
           ),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error sending password reset email'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        );
-      }
+        ),
+      );
     }
   }
 
@@ -249,12 +243,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               SizedBox(height: 16),
 
-              // Change Password Button
+              // Change Password Button - Updated to navigate to change password screen
               Container(
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: _changePassword,
+                  onPressed: _navigateToChangePassword, // Updated method call
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Color(0xFFF5F5F5),
                     foregroundColor: Colors.black,
