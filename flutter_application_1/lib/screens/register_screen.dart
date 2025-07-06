@@ -6,7 +6,6 @@ import '../utils/app_colors.dart';
 import '../utils/app_error.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '/screens/home.dart';
 
 class RegisterScreen extends StatefulWidget {
   @override

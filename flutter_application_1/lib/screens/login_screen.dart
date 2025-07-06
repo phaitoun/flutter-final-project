@@ -5,7 +5,6 @@ import '../utils/app_colors.dart';
 import '../utils/app_error.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'todo_screen.dart';
-import '/screens/home.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
