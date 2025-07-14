@@ -1,9 +1,11 @@
 // lib/screens/monthly_calendar_screen.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../utils/app_colors.dart';
 import '../models/task_model.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class MonthlyCalendarScreen extends StatefulWidget {
   @override
@@ -12,10 +14,13 @@ class MonthlyCalendarScreen extends StatefulWidget {
 
 class _MonthlyCalendarScreenState extends State<MonthlyCalendarScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
   DateTime currentMonth = DateTime.now();
   DateTime selectedDate = DateTime.now();
-  Map<String, Map<String, int>> taskStats =
-      {}; // dateKey -> {total: x, completed: y}
+  Map<String, Map<String, int>> taskStats = {};
+
+  StreamSubscription? _taskSubscription;
 
   @override
   void initState() {
@@ -23,7 +28,15 @@ class _MonthlyCalendarScreenState extends State<MonthlyCalendarScreen> {
     _loadMonthTaskStats();
   }
 
-  void _loadMonthTaskStats() async {
+  @override
+  void dispose() {
+    _taskSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _loadMonthTaskStats() {
+    _taskSubscription?.cancel();
+
     DateTime firstDayOfMonth = DateTime(
       currentMonth.year,
       currentMonth.month,
@@ -35,43 +48,44 @@ class _MonthlyCalendarScreenState extends State<MonthlyCalendarScreen> {
       0,
     );
 
-    try {
-      QuerySnapshot snapshot = await _firestore
-          .collection('tasks')
-          .where(
-            'date',
-            isGreaterThanOrEqualTo: Timestamp.fromDate(firstDayOfMonth),
-          )
-          .where(
-            'date',
-            isLessThanOrEqualTo: Timestamp.fromDate(lastDayOfMonth),
-          )
-          .get();
+    User? currentUser = _auth.currentUser;
 
-      Map<String, Map<String, int>> stats = {};
+    _taskSubscription = _firestore
+        .collection('tasks')
+        .where(
+          'date',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(firstDayOfMonth),
+        )
+        .where('date', isLessThanOrEqualTo: Timestamp.fromDate(lastDayOfMonth))
+        .where('userId', isEqualTo: currentUser?.uid)
+        .snapshots()
+        .listen(
+          (QuerySnapshot snapshot) {
+            Map<String, Map<String, int>> stats = {};
 
-      for (var doc in snapshot.docs) {
-        TaskModel task = TaskModel.fromFirestore(doc);
-        String dateKey = DateFormat('yyyy-MM-dd').format(task.date);
+            for (var doc in snapshot.docs) {
+              TaskModel task = TaskModel.fromFirestore(doc);
+              String dateKey = DateFormat('yyyy-MM-dd').format(task.date);
 
-        if (stats[dateKey] == null) {
-          stats[dateKey] = {'total': 0, 'completed': 0};
-        }
+              stats.putIfAbsent(dateKey, () => {'total': 0, 'completed': 0});
+              stats[dateKey]!['total'] = stats[dateKey]!['total']! + 1;
 
-        stats[dateKey]!['total'] = stats[dateKey]!['total']! + 1;
-        if (task.isCompleted) {
-          stats[dateKey]!['completed'] = stats[dateKey]!['completed']! + 1;
-        }
-      }
+              if (task.isCompleted) {
+                stats[dateKey]!['completed'] =
+                    stats[dateKey]!['completed']! + 1;
+              }
+            }
 
-      if (mounted) {
-        setState(() {
-          taskStats = stats;
-        });
-      }
-    } catch (e) {
-      print('Error loading task stats: $e');
-    }
+            if (mounted) {
+              setState(() {
+                taskStats = stats;
+              });
+            }
+          },
+          onError: (e) {
+            print('Error loading task stats: $e');
+          },
+        );
   }
 
   void _previousMonth() {
@@ -92,8 +106,6 @@ class _MonthlyCalendarScreenState extends State<MonthlyCalendarScreen> {
     setState(() {
       selectedDate = date;
     });
-
-    // Navigate back to TodoScreen with selected date
     Navigator.pop(context, date);
   }
 
@@ -116,7 +128,6 @@ class _MonthlyCalendarScreenState extends State<MonthlyCalendarScreen> {
 
     List<DateTime> days = [];
     for (int i = 0; i < 42; i++) {
-      // 6 weeks * 7 days
       days.add(startDate.add(Duration(days: i)));
     }
 
@@ -138,42 +149,6 @@ class _MonthlyCalendarScreenState extends State<MonthlyCalendarScreen> {
     return date.day == selectedDate.day &&
         date.month == selectedDate.month &&
         date.year == selectedDate.year;
-  }
-
-  Widget _buildTaskIndicator(DateTime date) {
-    String dateKey = DateFormat('yyyy-MM-dd').format(date);
-    Map<String, int>? stats = taskStats[dateKey];
-
-    if (stats == null || stats['total'] == 0) {
-      return SizedBox.shrink();
-    }
-
-    int total = stats['total']!;
-    int completed = stats['completed']!;
-
-    // Different indicator styles based on task status
-    if (completed == total) {
-      // All tasks completed - green dot
-      return Container(
-        width: 6,
-        height: 6,
-        decoration: BoxDecoration(color: Colors.green, shape: BoxShape.circle),
-      );
-    } else if (completed > 0) {
-      // Some tasks completed - orange dot
-      return Container(
-        width: 6,
-        height: 6,
-        decoration: BoxDecoration(color: Colors.orange, shape: BoxShape.circle),
-      );
-    } else {
-      // No tasks completed - red dot
-      return Container(
-        width: 6,
-        height: 6,
-        decoration: BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-      );
-    }
   }
 
   Widget _buildTaskStatusBar(DateTime date) {
@@ -210,6 +185,24 @@ class _MonthlyCalendarScreenState extends State<MonthlyCalendarScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildLegendItem(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 12,
+          height: 3,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(1.5),
+          ),
+        ),
+        SizedBox(width: 6),
+        Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+      ],
     );
   }
 
@@ -380,24 +373,6 @@ class _MonthlyCalendarScreenState extends State<MonthlyCalendarScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildLegendItem(Color color, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 12,
-          height: 3,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(1.5),
-          ),
-        ),
-        SizedBox(width: 6),
-        Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-      ],
     );
   }
 }

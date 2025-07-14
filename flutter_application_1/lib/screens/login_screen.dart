@@ -5,6 +5,7 @@ import '../utils/app_colors.dart';
 import '../utils/app_error.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'todo_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -83,6 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
       hintText: 'Password',
       controller: _passwordController,
       isPassword: true,
+      showPasswordToggle: true,
     );
   }
 
@@ -91,7 +93,10 @@ class _LoginScreenState extends State<LoginScreen> {
       alignment: Alignment.centerRight,
       child: TextButton(
         onPressed: () {
-          // Handle forgot password
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => ForgotPasswordScreen()),
+          );
         },
         child: Text(
           'Forgot password?',

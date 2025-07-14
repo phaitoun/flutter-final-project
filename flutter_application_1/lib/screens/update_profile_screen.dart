@@ -34,6 +34,30 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
   Future<void> _loadUserData() async {
     currentUser = _auth.currentUser;
     if (currentUser != null) {
+      // Always get names from Firebase Auth
+      String displayName = currentUser!.displayName?.trim() ?? '';
+      if (displayName.isNotEmpty) {
+        List<String> nameParts = displayName.split(' ');
+        setState(() {
+          _firstNameController.text = nameParts.isNotEmpty ? nameParts[0] : '';
+          _lastNameController.text = nameParts.length > 1
+              ? nameParts.sublist(1).join(' ')
+              : '';
+        });
+      } else {
+        // Extract from email if no display name
+        String email = currentUser!.email ?? '';
+        String extractedName = _extractNameFromEmail(email);
+        List<String> nameParts = extractedName.split(' ');
+        setState(() {
+          _firstNameController.text = nameParts.isNotEmpty ? nameParts[0] : '';
+          _lastNameController.text = nameParts.length > 1
+              ? nameParts.sublist(1).join(' ')
+              : '';
+        });
+      }
+
+      // Get profile image from Firestore (local path)
       try {
         DocumentSnapshot userDoc = await _firestore
             .collection('users')
@@ -44,26 +68,40 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
           Map<String, dynamic> userData =
               userDoc.data() as Map<String, dynamic>;
           setState(() {
-            _firstNameController.text = userData['firstName'] ?? '';
-            _lastNameController.text = userData['lastName'] ?? '';
-            _profileImageUrl = userData['profileImageUrl'];
-          });
-        } else {
-          String displayName = currentUser!.displayName ?? '';
-          List<String> nameParts = displayName.split(' ');
-          setState(() {
-            _firstNameController.text = nameParts.isNotEmpty
-                ? nameParts[0]
-                : '';
-            _lastNameController.text = nameParts.length > 1
-                ? nameParts.sublist(1).join(' ')
-                : '';
+            _profileImageUrl = userData['profileImageUrl']?.toString();
           });
         }
       } catch (e) {
-        print('Error loading user data: $e');
+        print('Error loading profile image: $e');
+        // Keep _profileImageUrl as null if can't load from Firestore
       }
     }
+  }
+
+  // Helper method to extract name from email
+  String _extractNameFromEmail(String email) {
+    if (email.isNotEmpty) {
+      String localPart = email.split('@')[0];
+      return localPart
+          .replaceAll(RegExp(r'[._]'), ' ')
+          .split(' ')
+          .map(
+            (word) => word.isNotEmpty
+                ? word[0].toUpperCase() + word.substring(1).toLowerCase()
+                : '',
+          )
+          .join(' ')
+          .trim();
+    }
+    return '';
+  }
+
+  // Helper method to check if the image URL is a local file path
+  bool _isLocalFile(String? url) {
+    if (url == null) return false;
+    return url.startsWith('/') ||
+        url.contains('Documents') ||
+        url.contains('Cache');
   }
 
   Future<void> _pickImage() async {
@@ -113,6 +151,7 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
     try {
       String? imageUrl = _profileImageUrl;
 
+      // Save new image locally if selected
       if (_selectedImage != null) {
         imageUrl = await _saveImageLocally();
         if (imageUrl == null) {
@@ -124,24 +163,28 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
         }
       }
 
+      // Update Firebase Auth display name
       String fullName =
           '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'
               .trim();
       await currentUser!.updateDisplayName(fullName);
 
-      // Update Firestore
+      // Only save profile image path to Firestore, not the names
       await _firestore.collection('users').doc(currentUser!.uid).set({
-        'firstName': _firstNameController.text.trim(),
-        'lastName': _lastNameController.text.trim(),
         'email': currentUser!.email,
         'profileImageUrl': imageUrl,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
       _showSnackBar('Profile updated successfully!', Colors.green);
+
+      // Wait a moment for the snackbar to show
       await Future.delayed(Duration(seconds: 1));
+
+      // Return true to indicate successful update
       Navigator.pop(context, true);
     } catch (e) {
+      print('Error updating profile: $e');
       _showSnackBar('Error updating profile: $e', Colors.red);
     } finally {
       setState(() {
@@ -172,32 +215,102 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
           border: Border.all(color: Color(0xFFD4A574), width: 3),
           color: Colors.grey[100],
         ),
-        child: _selectedImage != null
-            ? ClipOval(
-                child: Image.file(
-                  _selectedImage!,
-                  fit: BoxFit.cover,
-                  width: 120,
-                  height: 120,
+        child: Stack(
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              child: _selectedImage != null
+                  ? ClipOval(
+                      child: Image.file(
+                        _selectedImage!,
+                        fit: BoxFit.cover,
+                        width: 120,
+                        height: 120,
+                      ),
+                    )
+                  : _profileImageUrl != null && _profileImageUrl!.isNotEmpty
+                  ? ClipOval(
+                      child: _isLocalFile(_profileImageUrl!)
+                          ? Image.file(
+                              File(_profileImageUrl!),
+                              fit: BoxFit.cover,
+                              width: 120,
+                              height: 120,
+                              errorBuilder: (context, error, stackTrace) {
+                                return _buildDefaultAvatar();
+                              },
+                            )
+                          : Image.network(
+                              _profileImageUrl!,
+                              fit: BoxFit.cover,
+                              width: 120,
+                              height: 120,
+                              errorBuilder: (context, error, stackTrace) {
+                                return _buildDefaultAvatar();
+                              },
+                              loadingBuilder:
+                                  (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return Center(
+                                      child: CircularProgressIndicator(
+                                        color: Color(0xFFD4A574),
+                                        strokeWidth: 2,
+                                      ),
+                                    );
+                                  },
+                            ),
+                    )
+                  : _buildDefaultAvatar(),
+            ),
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: Color(0xFFD4A574),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
                 ),
-              )
-            : _profileImageUrl != null
-            ? ClipOval(
-                child: Image.file(
-                  File(_profileImageUrl!),
-                  fit: BoxFit.cover,
-                  width: 120,
-                  height: 120,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Icon(
-                      Icons.person,
-                      size: 60,
-                      color: Colors.grey[600],
-                    );
-                  },
-                ),
-              )
-            : Icon(Icons.person, size: 60, color: Colors.grey[600]),
+                child: Icon(Icons.camera_alt, color: Colors.white, size: 16),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDefaultAvatar() {
+    String initials = '';
+    if (_firstNameController.text.isNotEmpty) {
+      initials += _firstNameController.text[0].toUpperCase();
+    }
+    if (_lastNameController.text.isNotEmpty) {
+      initials += _lastNameController.text[0].toUpperCase();
+    }
+    if (initials.isEmpty) {
+      initials = 'U';
+    }
+
+    return Container(
+      width: 120,
+      height: 120,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Color(0xFFD4A574).withOpacity(0.1),
+      ),
+      child: Center(
+        child: Text(
+          initials,
+          style: TextStyle(
+            fontSize: 36,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFFD4A574),
+          ),
+        ),
       ),
     );
   }
@@ -231,6 +344,12 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
           filled: true,
           fillColor: Colors.grey[50],
         ),
+        onChanged: (value) {
+          // Refresh the default avatar when name changes
+          if (label.contains('Name')) {
+            setState(() {});
+          }
+        },
       ),
     );
   }
